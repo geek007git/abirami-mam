@@ -10,13 +10,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="market.css" />
 </head>
 <body>
-  <div class="announcement">Free delivery above ₹499 <span>•</span> Harvest batch packed this week</div>
+  <div class="announcement">Welcome to VS Organics <span>✦</span> Natural groceries for everyday Indian kitchens</div>
   <header class="site-header">
     <a class="brand" href="#/home" aria-label="VS Organics home"><span class="brand-mark">VS</span><span>VS ORGANICS<small>GOOD FOOD, EVERY DAY</small></span></a>
-    <nav aria-label="Primary navigation"><a href="#/shop">Shop</a><a href="#/story">Our promise</a><a href="#/track">Track order</a></nav>
-    <div class="header-actions"><a class="icon-button search-btn" href="#/shop" aria-label="Browse products">⌕</a><a class="admin-link" href="#/account">Account</a><button class="cart-button" aria-label="Open shopping cart">Bag <span id="cartCount">0</span></button><button class="menu-button" aria-label="Open menu" aria-expanded="false">Menu</button></div>
+    <nav aria-label="Primary navigation"><a href="#/shop">Shop all</a><a href="#/shop/Millets">Millets</a><a href="#/shop/Natural%20Sweeteners">Sweeteners</a><a href="#/story">Our story</a></nav>
+    <div class="header-actions"><form id="siteSearch" class="site-search" role="search"><label for="siteSearchInput" class="sr-only">Search products</label><input id="siteSearchInput" type="search" placeholder="Search your pantry" autocomplete="off"><button aria-label="Search products">⌕</button></form><a class="admin-link" href="#/account">Account</a><button class="cart-button" aria-label="Open shopping cart">Bag <span id="cartCount">0</span></button><button class="menu-button" aria-label="Open menu" aria-expanded="false">Menu</button></div>
   </header>
   <main id="app" tabindex="-1"></main>
   <footer>
@@ -29,7 +30,7 @@
   <aside class="cart-drawer" id="cartDrawer" aria-hidden="true" aria-label="Shopping cart"><div id="cartPanel"></div></aside>
   <div class="scrim" id="scrim"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <a class="whatsapp-float" href="#/contact" aria-label="Contact VS Organics on WhatsApp">WhatsApp</a>
+  <a class="whatsapp-float" href="#/contact" aria-label="Contact VS Organics">Contact us</a>
   <script type="module" src="storefront.js"></script>
 </body>
 </html>

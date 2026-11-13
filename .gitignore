@@ -7,3 +7,5 @@ dist/
 *.log
 *.zip
 .openai/
+.chrome-preview*/
+preview-*.png
