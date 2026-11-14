@@ -34,6 +34,30 @@ export async function productionApi(req,res,url){
     if(error||!data.session)return fail(res,401,'Invalid email or password');
     return json(res,200,{accessToken:data.session.access_token,refreshToken:data.session.refresh_token,expiresAt:data.session.expires_at});
   }
+  if(req.method==='POST'&&url.pathname==='/api/auth/recover'){
+    if(limited(req,'recover',5,60*60_000))return fail(res,429,'Please try again later');
+    if(!originAllowed(req))return fail(res,403,'Invalid origin');
+    const input=await parse(req);
+    if(!/^\S+@\S+\.\S+$/.test(input.email||''))return fail(res,400,'Enter a valid email address');
+    const base=process.env.SITE_URL|| (process.env.RENDER_EXTERNAL_HOSTNAME?`https://${process.env.RENDER_EXTERNAL_HOSTNAME}`:null);
+    if(!base)return fail(res,503,'Password recovery is not configured');
+    const {error}=await publicClient().auth.resetPasswordForEmail(input.email,{redirectTo:`${base.replace(/\/$/,'')}/reset-password`});
+    if(error){console.error('Password recovery:',error.message);return fail(res,503,'Password reset email could not be sent');}
+    return json(res,200,{message:'If this email has an account, a password reset link is on its way.'});
+  }
+  if(req.method==='POST'&&url.pathname==='/api/auth/recover/complete'){
+    if(limited(req,'recover-complete',10,60*60_000))return fail(res,429,'Please try again later');
+    if(!originAllowed(req))return fail(res,403,'Invalid origin');
+    const input=await parse(req);
+    if(typeof input.password!=='string'||input.password.length<10)return fail(res,400,'Use a password of at least 10 characters');
+    if(!input.accessToken||!input.refreshToken)return fail(res,400,'Reset link is incomplete');
+    const client=publicClient();
+    const {data,error}=await client.auth.setSession({access_token:input.accessToken,refresh_token:input.refreshToken});
+    if(error||!data.user)return fail(res,401,'Reset link has expired');
+    const updated=await client.auth.updateUser({password:input.password});
+    if(updated.error)return fail(res,400,updated.error.message);
+    return json(res,200,{message:'Password updated. Sign in with your new password.'});
+  }
   if(req.method==='POST'&&url.pathname==='/api/auth/register'){
     if(limited(req,'register',5,60*60_000))return fail(res,429,'Too many registration attempts');
     if(!originAllowed(req))return fail(res,403,'Invalid origin');

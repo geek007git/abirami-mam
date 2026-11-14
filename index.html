@@ -13,10 +13,10 @@
   <link rel="stylesheet" href="market.css" />
 </head>
 <body>
-  <div class="announcement">Welcome to VS Organics <span>✦</span> Natural groceries for everyday Indian kitchens</div>
+  <div class="announcement">VS Organics · Groceries for everyday Indian kitchens</div>
   <header class="site-header">
     <a class="brand" href="#/home" aria-label="VS Organics home"><span class="brand-mark">VS</span><span>VS ORGANICS<small>GOOD FOOD, EVERY DAY</small></span></a>
-    <nav aria-label="Primary navigation"><a href="#/shop">Shop all</a><a href="#/shop/Millets">Millets</a><a href="#/shop/Natural%20Sweeteners">Sweeteners</a><a href="#/story">Our story</a></nav>
+    <nav aria-label="Primary navigation"><a href="#/shop">Shop all</a><a href="#/shop/Millets">Millets</a><a href="#/shop/Natural%20Sweeteners">Sweeteners</a><a href="#/story">Our story</a><a class="mobile-only" href="#/account">Account</a></nav>
     <div class="header-actions"><form id="siteSearch" class="site-search" role="search"><label for="siteSearchInput" class="sr-only">Search products</label><input id="siteSearchInput" type="search" placeholder="Search your pantry" autocomplete="off"><button aria-label="Search products">⌕</button></form><a class="admin-link" href="#/account">Account</a><button class="cart-button" aria-label="Open shopping cart">Bag <span id="cartCount">0</span></button><button class="menu-button" aria-label="Open menu" aria-expanded="false">Menu</button></div>
   </header>
   <main id="app" tabindex="-1"></main>
@@ -24,13 +24,12 @@
     <div class="footer-brand"><div class="brand-mark">VS</div><h2>Better staples.<br>Healthier homes.</h2></div>
     <div><h3>Explore</h3><a href="#/shop">Shop all</a><a href="#/story">Our story</a><a href="#/track">Track order</a><a href="#/account">Account</a><a href="#/admin">Staff</a></div>
     <div><h3>Help</h3><a href="#/policy/shipping">Shipping</a><a href="#/policy/refunds">Returns & refunds</a><a href="#/policy/privacy">Privacy</a></div>
-    <div><h3>Join our pantry notes</h3><p>New arrivals, simple recipes, and useful food stories.</p><form id="newsletter"><input type="email" required placeholder="Email address" aria-label="Email address"><button>Join</button></form></div>
-    <p class="fineprint">© 2026 VS Organics · Natural groceries for Indian homes · FSSAI details to be added before launch</p>
+    <div><h3>Get in touch</h3><p>Questions about an order or a product?</p><a href="#/contact">Contact the store →</a></div>
+    <p class="fineprint">© 2026 VS Organics · Groceries for everyday kitchens</p>
   </footer>
   <aside class="cart-drawer" id="cartDrawer" aria-hidden="true" aria-label="Shopping cart"><div id="cartPanel"></div></aside>
   <div class="scrim" id="scrim"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <a class="whatsapp-float" href="#/contact" aria-label="Contact VS Organics">Contact us</a>
   <script type="module" src="storefront.js"></script>
 </body>
 </html>

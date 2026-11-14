@@ -15,6 +15,13 @@ test('storefront surfaces shopping categories and stock-aware actions', () => {
   assert.match(html, /Sold out/);
 });
 
+test('empty catalogue shows an honest opening state', () => {
+  const html = renderHome([], helpers);
+  assert.match(html, /hero-pantry\.webp/);
+  assert.match(html, /stocking the shelves/);
+  assert.doesNotMatch(html, /data-add=/);
+});
+
 test('catalogue search filters products and escapes the search term', () => {
   const html = renderShop(products, 'search:<ragi>', helpers);
   assert.doesNotMatch(html, /<ragi>/);
