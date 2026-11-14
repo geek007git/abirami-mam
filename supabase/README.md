@@ -10,4 +10,4 @@ Once the Supabase integration is connected:
 6. Run RLS allow/deny tests before loading real customers or orders.
 7. Put the project URL and keys into deployment secrets; never expose the service-role key to browser code.
 
-The checkout transaction and Razorpay webhook execute with the secret key on the server. Public clients must never write orders, payments, inventory, webhook events, notification jobs, or audit logs directly. Before real orders, run concurrent checkout, payment retry, RLS, and refund tests against development and complete a backup restore rehearsal.
+The COD checkout transaction executes with the secret key on the server. Public clients must never write orders, payments, inventory, notification jobs, or audit logs directly. Before real orders, run concurrent checkout and RLS tests against development and complete a backup restore rehearsal.

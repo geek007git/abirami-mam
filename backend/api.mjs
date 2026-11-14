@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import { adminClient, publicClient, assertData, requireStaff, catalog } from './supabase.mjs';
 import { checkout, productWrite, variantWrite, variantPatch, statusWrite } from './validation.mjs';
-import { createRazorpayOrder, fetchRazorpayPayment, verifyCheckoutSignature, verifyWebhookSignature } from './payments.mjs';
 
 const json=(res,status,data)=>{res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(data));};
 const fail=(res,status,message)=>json(res,status,{error:message});
@@ -15,7 +14,7 @@ const audit=async(actor,action,entityType,entityId,before,after)=>{assertData(aw
 export async function productionApi(req,res,url){
   const db=adminClient();
   if(req.method==='GET'&&url.pathname==='/api/health')return json(res,200,{ok:true,mode:'supabase'});
-  if(req.method==='GET'&&url.pathname==='/api/config')return json(res,200,{catalogSource:'supabase',storeLive:process.env.STORE_LIVE==='true',onlinePayments:Boolean(process.env.RAZORPAY_KEY_ID&&process.env.RAZORPAY_KEY_SECRET&&process.env.RAZORPAY_WEBHOOK_SECRET),whatsappNumber:process.env.WHATSAPP_NUMBER||null});
+  if(req.method==='GET'&&url.pathname==='/api/config')return json(res,200,{catalogSource:'supabase',storeLive:process.env.STORE_LIVE==='true',whatsappNumber:process.env.WHATSAPP_NUMBER||null});
   if(req.method==='GET'&&url.pathname==='/api/catalog/products')return json(res,200,{items:await catalog()});
   if(req.method==='GET'&&url.pathname==='/api/catalog/categories')return json(res,200,{items:assertData(await db.from('categories').select('id,name,slug').eq('active',true).order('sort_order'))});
   if(req.method==='POST'&&url.pathname==='/api/auth/login'){
@@ -74,40 +73,10 @@ export async function productionApi(req,res,url){
     if(process.env.STORE_LIVE!=='true')return fail(res,503,'Checkout opens after store setup is approved');
     const parsed=checkout.safeParse(await parse(req));if(!parsed.success)return fail(res,400,parsed.error.issues[0]?.message||'Invalid checkout');
     const input=parsed.data;
-    if(input.paymentMethod==='online'&&(!process.env.RAZORPAY_KEY_ID||!process.env.RAZORPAY_KEY_SECRET||!process.env.RAZORPAY_WEBHOOK_SECRET))return fail(res,503,'Online payments are not ready');
     const access=(req.headers.authorization||'').replace(/^Bearer /i,'');let customerId=null;
     if(access){const identity=await db.auth.getUser(access);if(!identity.error&&identity.data.user)customerId=identity.data.user.id;}
     const order=assertData(await db.rpc('place_checkout',{p_items:input.items,p_customer:input.customer,p_address:input.address,p_payment_method:input.paymentMethod,p_coupon:input.coupon||null,p_notes:input.notes||null,p_customer_id:customerId}));
-    if(input.paymentMethod==='online'){
-      try{
-        const payment=await createRazorpayOrder(order.total_paise,order.order_number);
-        assertData(await db.from('payments').update({provider_order_id:payment.id}).eq('order_id',order.id));
-        return json(res,201,{orderNumber:order.order_number,trackingToken:order.tracking_token,total:order.total_paise,status:order.status,payment:{keyId:process.env.RAZORPAY_KEY_ID,orderId:payment.id,amount:order.total_paise,currency:'INR'}});
-      }catch(error){assertData(await db.rpc('release_order_reservation',{p_order_id:order.id,p_reason:'PAYMENT_SETUP_FAILED'}));throw error;}
-    }
     return json(res,201,{orderNumber:order.order_number,trackingToken:order.tracking_token,total:order.total_paise,status:order.status});
-  }
-  if(req.method==='POST'&&url.pathname==='/api/payments/razorpay/verify'){
-    if(!originAllowed(req))return fail(res,403,'Invalid origin');
-    const input=await parse(req);const payment=assertData(await db.from('payments').select('order_id,provider_order_id,amount_paise').eq('provider_order_id',input.razorpay_order_id).maybeSingle());
-    if(!payment||!verifyCheckoutSignature(payment.provider_order_id,input.razorpay_payment_id,input.razorpay_signature,process.env.RAZORPAY_KEY_SECRET))return fail(res,400,'Payment signature invalid');
-    const captured=await fetchRazorpayPayment(input.razorpay_payment_id);
-    if(captured.status!=='captured'||captured.order_id!==payment.provider_order_id||captured.amount!==payment.amount_paise)return fail(res,409,'Payment is not captured for this order');
-    const order=assertData(await db.rpc('commit_online_payment',{p_order_id:payment.order_id,p_payment_id:input.razorpay_payment_id,p_event_id:null}));
-    return json(res,200,{orderNumber:order.order_number,status:order.status});
-  }
-  if(req.method==='POST'&&url.pathname==='/api/webhooks/razorpay'){
-    let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>1_000_000)return fail(res,413,'Payload too large');}
-    if(!verifyWebhookSignature(raw,req.headers['x-razorpay-signature'],process.env.RAZORPAY_WEBHOOK_SECRET))return fail(res,401,'Invalid signature');
-    const event=JSON.parse(raw);const eventId=req.headers['x-razorpay-event-id'];
-    if(!eventId)return fail(res,400,'Missing event ID');
-    if(event.event==='payment.captured'||event.event==='order.paid'){
-      const paymentId=event.payload?.payment?.entity?.id;
-      const providerOrderId=event.payload?.payment?.entity?.order_id||event.payload?.order?.entity?.id;
-      const payment=assertData(await db.from('payments').select('order_id,amount_paise').eq('provider_order_id',providerOrderId).maybeSingle());
-      if(payment&&paymentId&&event.payload?.payment?.entity?.status==='captured'&&event.payload.payment.entity.amount===payment.amount_paise)assertData(await db.rpc('commit_online_payment',{p_order_id:payment.order_id,p_payment_id:paymentId,p_event_id:eventId}));
-    }
-    return json(res,200,{ok:true});
   }
   if(url.pathname.startsWith('/api/admin/')){
     const read=req.method==='GET';if(!read&&!originAllowed(req))return fail(res,403,'Invalid origin');
@@ -190,4 +159,4 @@ export async function productionApi(req,res,url){
   return fail(res,404,'Not found');
 }
 
-export function productionError(res,error){const message=error?.message||'Unexpected error';console.error(message);const publicMessages=['Invalid checkout','Invalid contact details','Invalid address','PIN code not serviceable','COD unavailable','Invalid quantity','Quantity limit exceeded','Variant unavailable','Product unavailable','Insufficient stock','Coupon unavailable','Coupon minimum not reached','Coupon limit reached','Coupon already used','COD order value unavailable','Duplicate variants in cart','Invalid order transition','Courier and tracking required','Permission denied','Online payments are not configured'];const safe=publicMessages.find(m=>message.startsWith(m));return fail(res,safe?400:500,safe?message:'Something went wrong. Please try again.');}
+export function productionError(res,error){const message=error?.message||'Unexpected error';console.error(message);const publicMessages=['Invalid checkout','Invalid contact details','Invalid address','PIN code not serviceable','COD unavailable','Invalid quantity','Quantity limit exceeded','Variant unavailable','Product unavailable','Insufficient stock','Coupon unavailable','Coupon minimum not reached','Coupon limit reached','Coupon already used','COD order value unavailable','Duplicate variants in cart','Invalid order transition','Courier and tracking required','Permission denied'];const safe=publicMessages.find(m=>message.startsWith(m));return fail(res,safe?400:500,safe?message:'Something went wrong. Please try again.');}

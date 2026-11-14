@@ -6,7 +6,7 @@ declare
   v_reserved integer; v_subtotal integer:=0; v_discount integer:=0; v_shipping integer:=0;
   v_coupon public.coupons%rowtype; v_count integer; v_key text;
 begin
-  if p_payment_method not in ('cod','online') or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)<1 or jsonb_array_length(p_items)>40 then raise exception 'Invalid checkout'; end if;
+  if p_payment_method is distinct from 'cod' or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)<1 or jsonb_array_length(p_items)>40 then raise exception 'Invalid checkout'; end if;
   if (select count(*) from jsonb_array_elements(p_items))<>(select count(distinct value->>'variantId') from jsonb_array_elements(p_items)) then raise exception 'Duplicate variants in cart'; end if;
   if length(trim(p_customer->>'name'))<2 or p_customer->>'email' !~* '^[^@ ]+@[^@ ]+\.[^@ ]+$' or p_customer->>'phone' !~ '^[6-9][0-9]{9}$' then raise exception 'Invalid contact details'; end if;
   if p_address->>'pin' !~ '^[1-9][0-9]{5}$' or length(trim(p_address->>'line1'))<5 then raise exception 'Invalid address'; end if;

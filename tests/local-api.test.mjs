@@ -30,7 +30,7 @@ test('preview configuration keeps checkout closed in the storefront', async () =
   const response = await call('GET', '/api/config');
   assert.equal(response.status, 200);
   assert.equal(response.body.storeLive, false);
-  assert.equal(response.body.onlinePayments, false);
+  assert.equal('onlinePayments' in response.body, false);
 });
 
 test('quote rejects invalid quantities and repeated lines exceeding stock', async () => {
@@ -50,7 +50,7 @@ test('local checkout rejects fake online orders and keeps inventory intact', asy
   const address = { pin: '600001' };
   const items = [{ variantId: 'palm-jaggery', quantity: 1 }];
   const online = await call('POST', '/api/orders', { items, customer, address, paymentMethod: 'online' });
-  assert.equal(online.status, 503);
+  assert.equal(online.status, 400);
   const before = await call('GET', '/api/catalog/products');
   assert.equal(before.body.items.find(item => item.id === 'palm-jaggery').stock, 24);
   const invalid = await call('POST', '/api/orders', { items: [{ variantId: 'palm-jaggery', quantity: 0 }], customer, address, paymentMethod: 'cod' });
