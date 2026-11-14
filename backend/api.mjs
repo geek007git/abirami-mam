@@ -15,7 +15,7 @@ const audit=async(actor,action,entityType,entityId,before,after)=>{assertData(aw
 export async function productionApi(req,res,url){
   const db=adminClient();
   if(req.method==='GET'&&url.pathname==='/api/health')return json(res,200,{ok:true,mode:'supabase'});
-  if(req.method==='GET'&&url.pathname==='/api/config')return json(res,200,{catalogSource:'supabase',storeLive:process.env.STORE_LIVE==='true',onlinePayments:Boolean(process.env.RAZORPAY_KEY_ID&&process.env.RAZORPAY_KEY_SECRET),whatsappNumber:process.env.WHATSAPP_NUMBER||null});
+  if(req.method==='GET'&&url.pathname==='/api/config')return json(res,200,{catalogSource:'supabase',storeLive:process.env.STORE_LIVE==='true',onlinePayments:Boolean(process.env.RAZORPAY_KEY_ID&&process.env.RAZORPAY_KEY_SECRET&&process.env.RAZORPAY_WEBHOOK_SECRET),whatsappNumber:process.env.WHATSAPP_NUMBER||null});
   if(req.method==='GET'&&url.pathname==='/api/catalog/products')return json(res,200,{items:await catalog()});
   if(req.method==='GET'&&url.pathname==='/api/catalog/categories')return json(res,200,{items:assertData(await db.from('categories').select('id,name,slug').eq('active',true).order('sort_order'))});
   if(req.method==='POST'&&url.pathname==='/api/auth/login'){
@@ -74,7 +74,7 @@ export async function productionApi(req,res,url){
     if(process.env.STORE_LIVE!=='true')return fail(res,503,'Checkout opens after store setup is approved');
     const parsed=checkout.safeParse(await parse(req));if(!parsed.success)return fail(res,400,parsed.error.issues[0]?.message||'Invalid checkout');
     const input=parsed.data;
-    if(input.paymentMethod==='online'&&(!process.env.RAZORPAY_KEY_ID||!process.env.RAZORPAY_KEY_SECRET))return fail(res,503,'Online payments are not ready');
+    if(input.paymentMethod==='online'&&(!process.env.RAZORPAY_KEY_ID||!process.env.RAZORPAY_KEY_SECRET||!process.env.RAZORPAY_WEBHOOK_SECRET))return fail(res,503,'Online payments are not ready');
     const access=(req.headers.authorization||'').replace(/^Bearer /i,'');let customerId=null;
     if(access){const identity=await db.auth.getUser(access);if(!identity.error&&identity.data.user)customerId=identity.data.user.id;}
     const order=assertData(await db.rpc('place_checkout',{p_items:input.items,p_customer:input.customer,p_address:input.address,p_payment_method:input.paymentMethod,p_coupon:input.coupon||null,p_notes:input.notes||null,p_customer_id:customerId}));

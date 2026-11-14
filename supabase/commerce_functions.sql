@@ -81,6 +81,8 @@ create or replace function public.commit_online_payment(p_order_id uuid,p_paymen
 returns public.orders language plpgsql security definer set search_path='' as $$
 declare v_order public.orders%rowtype; v_res public.inventory_reservations%rowtype;
 begin
+  -- Keep stock changes in the same critical section as checkout reservations.
+  perform pg_advisory_xact_lock(734201);
   if p_event_id is not null then
     insert into public.webhook_events(provider_event_id,event_type,payload,processed_at) values(p_event_id,'payment.captured','{}',now()) on conflict do nothing;
     if not found then select * into v_order from public.orders where id=p_order_id; return v_order; end if;
@@ -133,9 +135,11 @@ create or replace function public.adjust_inventory(p_variant_id uuid,p_delta int
 returns public.product_variants language plpgsql security definer set search_path='' as $$
 declare v_role public.staff_role; v_variant public.product_variants%rowtype;
 begin
+  perform pg_advisory_xact_lock(734201);
   select role into v_role from public.profiles where id=p_actor and active;
   if v_role not in ('OWNER','CATALOG_MANAGER') then raise exception 'Permission denied'; end if;
   if p_delta=0 or length(trim(p_reason))<4 then raise exception 'Quantity change and reason required'; end if;
+  if p_delta<0 and (select stock_on_hand+p_delta-coalesce((select sum(quantity) from public.inventory_reservations where variant_id=p_variant_id and status='ACTIVE' and expires_at>now()),0) from public.product_variants where id=p_variant_id)<0 then raise exception 'Stock is reserved for pending orders'; end if;
   update public.product_variants set stock_on_hand=stock_on_hand+p_delta where id=p_variant_id and stock_on_hand+p_delta>=0 returning * into v_variant;
   if not found then raise exception 'Variant missing or stock would become negative'; end if;
   insert into public.inventory_movements(variant_id,quantity_delta,reason,actor_id) values(p_variant_id,p_delta,p_reason,p_actor);

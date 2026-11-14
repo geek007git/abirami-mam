@@ -12,7 +12,7 @@ import { processNotificationJobs } from './backend/email.mjs';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'dist');
 const dataDir = path.join(root, '.data');
-const dataFile = path.join(dataDir, 'store.json');
+const dataFile = process.env.LOCAL_STORE_FILE || path.join(dataDir, 'store.json');
 const port = Number(process.env.PORT || 4173);
 const productSeed = [
   { id:'palm-jaggery', name:'Palm Jaggery Powder', price:22000, mrp:25000, stock:24, active:true },
@@ -26,7 +26,7 @@ const productSeed = [
 ];
 
 async function loadStore(){
-  await mkdir(dataDir,{recursive:true});
+  await mkdir(path.dirname(dataFile),{recursive:true});
   if(!existsSync(dataFile)) await writeFile(dataFile,JSON.stringify({products:productSeed,orders:[],settings:{shippingFee:6000,freeShippingThreshold:49900,codEnabled:true}},null,2));
   const store=JSON.parse(await readFile(dataFile,'utf8'));
   if(store.orders.length===0&&store.products.some(p=>p.id==='classic')){
@@ -40,23 +40,26 @@ function send(res,status,body,headers={}){res.writeHead(status,{'content-type':'
 async function body(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>1_000_000)throw new Error('Payload too large');}return raw?JSON.parse(raw):{};}
 function safeEqual(a,b){const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&crypto.timingSafeEqual(x,y);}
 
-async function api(req,res,url){
+export async function api(req,res,url){
   if(configured())return productionApi(req,res,url);
   if(process.env.NODE_ENV==='production')return send(res,503,{error:'Database connection is not configured'});
   const store=await loadStore();
   if(req.method==='GET'&&url.pathname==='/api/health') return send(res,200,{ok:true,mode:process.env.SUPABASE_URL?'supabase-ready':'local-development'});
+  if(req.method==='GET'&&url.pathname==='/api/config') return send(res,200,{catalogSource:'preview',storeLive:false,onlinePayments:false,whatsappNumber:null});
   if(req.method==='GET'&&url.pathname==='/api/catalog/products') return send(res,200,{items:store.products.filter(p=>p.active)});
   if(req.method==='POST'&&url.pathname==='/api/checkout/quote'){
     const input=await body(req);const lines=[];
-    for(const item of input.items||[]){const product=store.products.find(p=>p.id===item.id&&p.active);if(!product) return send(res,400,{error:'Product unavailable'});const quantity=Math.max(1,Math.min(10,Number(item.quantity)||1));if(quantity>product.stock)return send(res,409,{error:`Only ${product.stock} ${product.name} available`});lines.push({price:product.price,quantity});}
+    if(!Array.isArray(input.items)||!input.items.length||input.items.length>40)return send(res,400,{error:'Invalid cart'});
+    const quantities=new Map();for(const item of input.items){const product=store.products.find(p=>p.id===(item.variantId||item.id)&&p.active);if(!product) return send(res,400,{error:'Product unavailable'});const quantity=item.quantity;if(!Number.isInteger(quantity)||quantity<1||quantity>20)return send(res,400,{error:'Invalid quantity'});quantities.set(product.id,(quantities.get(product.id)||0)+quantity);if(quantities.get(product.id)>product.stock)return send(res,409,{error:`Only ${product.stock} ${product.name} available`});lines.push({price:product.price,quantity});}
     return send(res,200,quoteCart(lines,null,store.settings.freeShippingThreshold,store.settings.shippingFee));
   }
   if(req.method==='POST'&&url.pathname==='/api/orders'){
-    const input=await body(req);if(!Array.isArray(input.items)||!input.items.length)return send(res,400,{error:'Your bag is empty'});
-    if(!input.customer?.name||!/^\S+@\S+\.\S+$/.test(input.customer.email||'')||!/[1-9][0-9]{5}/.test(input.address?.pin||''))return send(res,400,{error:'Please complete your contact and delivery details'});
-    const lines=[];for(const item of input.items){const p=store.products.find(x=>x.id===item.id&&x.active);const qty=Math.max(1,Number(item.quantity)||1);if(!p||qty>p.stock)return send(res,409,{error:`${p?.name||'Item'} is no longer available`});lines.push({product:p,quantity:qty,variant:item.variant});}
+    const input=await body(req);if(!Array.isArray(input.items)||!input.items.length||input.items.length>40)return send(res,400,{error:'Your bag is empty'});
+    if(input.paymentMethod!=='cod')return send(res,503,{error:'Online payments require a configured production store'});
+    if(!String(input.customer?.name||'').trim()||!/^\S+@\S+\.\S+$/.test(input.customer?.email||'')||!/^[1-9][0-9]{5}$/.test(input.address?.pin||''))return send(res,400,{error:'Please complete your contact and delivery details'});
+    const lines=[];const quantities=new Map();for(const item of input.items){const p=store.products.find(x=>x.id===(item.variantId||item.id)&&x.active);const qty=item.quantity;if(!Number.isInteger(qty)||qty<1||qty>20)return send(res,400,{error:'Invalid quantity'});if(!p)return send(res,409,{error:'Item is no longer available'});quantities.set(p.id,(quantities.get(p.id)||0)+qty);if(quantities.get(p.id)>p.stock)return send(res,409,{error:`${p.name} is no longer available`});lines.push({product:p,quantity:qty,variant:item.variant});}
     const totals=quoteCart(lines.map(x=>({price:x.product.price,quantity:x.quantity})),null,store.settings.freeShippingThreshold,store.settings.shippingFee);
-    const cod=input.paymentMethod==='cod';const orderNumber=`VSO-${String(1043+store.orders.length).padStart(4,'0')}`;const trackingToken=crypto.randomUUID();
+    const cod=true;const orderNumber=`VSO-${String(1043+store.orders.length).padStart(4,'0')}`;const trackingToken=crypto.randomUUID();
     const order={id:crypto.randomUUID(),orderNumber,trackingToken,customer:input.customer,address:input.address,items:lines.map(x=>({productId:x.product.id,name:x.product.name,variant:x.variant,quantity:x.quantity,unitPrice:x.product.price})),...totals,status:cod?'PLACED':'PENDING_PAYMENT',paymentStatus:cod?'NOT_REQUIRED':'PENDING',createdAt:new Date().toISOString(),history:[{status:cod?'PLACED':'PENDING_PAYMENT',at:new Date().toISOString()}]};
     if(cod)for(const line of lines)line.product.stock-=line.quantity;
     store.orders.push(order);await saveStore(store);
@@ -77,5 +80,7 @@ async function api(req,res,url){
 
 const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.svg':'image/svg+xml'};
 const server=http.createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost');if(url.pathname.startsWith('/api/'))return await api(req,res,url);let rel=decodeURIComponent(url.pathname);if(rel==='/'||rel==='')rel='/index.html';const target=path.resolve(publicDir,'.'+rel);if(target!==publicDir&&!target.startsWith(publicDir+path.sep))return send(res,403,{error:'Forbidden'});try{const file=await readFile(target);res.writeHead(200,{'content-type':types[path.extname(target)]||'application/octet-stream'});res.end(file);}catch{const file=await readFile(path.join(publicDir,'index.html'));res.writeHead(200,{'content-type':types['.html']});res.end(file);}}catch(error){if(configured())return productionError(res,error);send(res,error.message==='Payload too large'?413:500,{error:error.message});}});
-server.listen(port,process.env.NODE_ENV==='production'?'0.0.0.0':'127.0.0.1',()=>console.log(`VS Organics: http://localhost:${port}`));
-if(configured())setInterval(async()=>{try{assertData(await adminClient().rpc('expire_order_reservations'));await processNotificationJobs();}catch(error){console.error('Background job failed:',error.message)}},60_000).unref();
+if(process.env.NODE_ENV!=='test'){
+  server.listen(port,process.env.NODE_ENV==='production'?'0.0.0.0':'127.0.0.1',()=>console.log(`VS Organics: http://localhost:${port}`));
+  if(configured())setInterval(async()=>{try{assertData(await adminClient().rpc('expire_order_reservations'));await processNotificationJobs();}catch(error){console.error('Background job failed:',error.message)}},60_000).unref();
+}
