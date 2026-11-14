@@ -14,6 +14,16 @@ const audit=async(actor,action,entityType,entityId,before,after)=>{assertData(aw
 export async function productionApi(req,res,url){
   const db=adminClient();
   if(req.method==='GET'&&url.pathname==='/api/health')return json(res,200,{ok:true,mode:'supabase'});
+  if(req.method==='GET'&&url.pathname==='/api/health/catalog'){
+    const checks={};
+    for(const table of ['products','product_variants','product_images']){
+      const result=await db.from(table).select('id').limit(1);
+      checks[table]=result.error?.code||'ok';
+    }
+    const embedded=await db.from('products').select('id,category:categories(id),variants:product_variants(id),images:product_images(id)').limit(1);
+    checks.relationships=embedded.error?.code||'ok';
+    return json(res,200,{revision:process.env.RENDER_GIT_COMMIT?.slice(0,7)||null,checks});
+  }
   if(req.method==='GET'&&url.pathname==='/api/config')return json(res,200,{catalogSource:'supabase',storeLive:process.env.STORE_LIVE==='true',whatsappNumber:process.env.WHATSAPP_NUMBER||null});
   if(req.method==='GET'&&url.pathname==='/api/catalog/products')return json(res,200,{items:await catalog()});
   if(req.method==='GET'&&url.pathname==='/api/catalog/categories')return json(res,200,{items:assertData(await db.from('categories').select('id,name,slug').eq('active',true).order('sort_order'))});
