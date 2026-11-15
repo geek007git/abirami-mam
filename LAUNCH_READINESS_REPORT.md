@@ -1,12 +1,12 @@
 # VS Organics launch readiness report
 
 Date: 15 November 2026  
-Environment tested: local launch rehearsal at `http://localhost:4173`  
+Environment tested: live client preview at `https://vs-organics-store.onrender.com` (revision `424605c`)  
 Decision: **GO for client review/UAT; NO-GO for public sales launch**
 
 ## Executive assessment
 
-The storefront is visually strong enough to present to the client and the main shopping journey works well as a rehearsal. Product imagery, category browsing, search, product details, add-to-bag, totals and the checkout safety gate were verified. The application is intentionally not ready to accept real orders: production services and the client's approved catalogue, labels, policies and operating rules are still missing.
+The storefront is ready for client review on Render. Four clearly marked sample products are live in Supabase, with provisional images and prices. Category browsing, add-to-bag, totals and the checkout safety gate were verified on the live site. Real orders remain disabled while the client approves the catalogue, labels, policies and operating rules.
 
 ## Work completed for this rehearsal
 
@@ -16,6 +16,8 @@ The storefront is visually strong enough to present to the client and the main s
 - Added correct server content types for JPEG, PNG and WebP assets.
 - Added an automated accessibility/rendering check for catalogue imagery.
 - Documented that preview images and sample catalogue data must be replaced before publication.
+- Added four demo catalogue rows to the live Supabase project and an owner-only admin invitation form.
+- Deployed revision `424605c` to Render after the automatic deploy did not start.
 
 ## Verification results
 
@@ -31,25 +33,29 @@ The storefront is visually strong enough to present to the client and the main s
 | Search/category routing | PASS | Covered by automated tests and browser navigation |
 | Invalid quantity/stock protection | PASS | Covered by local API tests |
 | Online-payment rejection | PASS | Local rehearsal accepts only the intended COD test path |
-| Production image upload | NOT LIVE-TESTED | UI and API exist, but Supabase Storage and staff authentication are not configured |
-| Real order/email flow | NOT TESTED | Requires production Supabase, approved delivery rules and Resend configuration |
+| Live Render/Supabase catalogue | PASS | Four published demo rows returned by `/api/catalog/products` |
+| Live preview imagery | PASS | Four JPEG assets served with HTTP 200 and `image/jpeg`; visual review of shop cards passed |
+| Live checkout gate | PASS | `/api/config` returned `storeLive=false`; Place order was disabled in the browser |
+| Owner invitation | READY, NOT SENT | Owner-only invitation form deployed; client email and acceptance still need verification |
+| Production image upload | NOT LIVE-TESTED | The admin upload UI and Storage bucket exist; a real owner session is needed to test upload |
+| Real order/email flow | NOT TESTED | Requires approved delivery rules, notification sender and controlled production UAT |
 
 ## Public-launch blockers
 
 1. Obtain the final client-approved catalogue: product names, SKUs, pack sizes, prices, MRP, tax treatment and stock.
 2. Replace generated preview photos with approved pack shots and approved alt text.
 3. Approve ingredients, nutrition/allergen text, storage guidance, net quantity, manufacturer/packer details, batch/expiry presentation and FSSAI information.
-4. Configure production Supabase, the `product-images` bucket, staff accounts, role policies and backup/restore rehearsal.
+4. Complete and verify the client's owner invitation, role policies and backup/restore rehearsal.
 5. Confirm delivery PIN coverage, shipping fee/free-shipping threshold, COD limits, courier process and cancellation/refund rules.
 6. Publish legally reviewed shipping, refund, privacy and terms pages instead of the current placeholders.
 7. Configure the official support phone/WhatsApp number and order-notification email.
-8. Deploy to the final domain, verify HTTPS and run a real-device mobile/tablet/desktop UAT pass.
+8. Choose the final domain and run a real-device mobile/tablet/desktop UAT pass.
 9. Run controlled end-to-end test orders, including last-unit concurrency, cancellation, dispatch/tracking and customer isolation.
 10. Set `STORE_LIVE=true` only after the client signs off on the above items.
 
 ## Client handoff recommendation
 
-Show this build as a **catalogue and workflow preview**, not as a live shop. Ask the client to approve the visual direction and complete the launch data checklist. Once those inputs and service credentials are configured, perform production UAT and only then enable orders.
+Show the Render URL as a **catalogue and workflow preview**. Ask the client to approve the visual direction and complete the launch data checklist. Perform production UAT and only then enable orders.
 
 ## Provisional image prompt set
 
