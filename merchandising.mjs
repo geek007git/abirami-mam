@@ -10,6 +10,7 @@ export function renderProductCard(product, { money, escape, visual }) {
       ${hasPhoto ? visual(product) : `<span class="market-card-placeholder"><small>VS ORGANICS</small><strong>${escape(product.name)}</strong></span>`}
     </a>
     <div class="market-card-body">
+      ${product.label_info?.demo ? '<p class="market-demo-label">Sample product · Preview image</p>' : ''}
       <p class="market-card-category">${escape(product.category || 'Groceries')}</p>
       <h3><a href="#/product/${encodeURIComponent(product.id)}">${escape(product.name)}</a></h3>
       <p class="market-card-size">${escape(variant.label)}</p>

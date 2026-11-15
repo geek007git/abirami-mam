@@ -13,4 +13,8 @@ The source is prepared for one Render Node web service and a Supabase project. T
 8. Run full UAT: guest and account COD checkout, concurrent last-unit checkout, shipment email, owner cancellation, customer isolation, and mobile accessibility. Rehearse database backup restoration.
 9. Set `STORE_LIVE=true` only after those checks are approved. Until then Render may show the catalogue while checkout remains closed.
 
+For a client review, `supabase/demo_catalog.sql` adds four clearly marked sample products and prices. The storefront uses the provisional images in `assets/products` for these demo rows. Keep `STORE_LIVE=false` throughout the review; replace the demo rows and images with approved catalogue data before opening checkout.
+
+An existing owner can open `/#/admin/staff` and invite another owner by email. The invitee opens the email, sets their own password, and signs in at `/#/admin`. The Supabase Auth redirect allowlist must include the live site's `/reset-password` URL. Do not share passwords or invitation links through chat.
+
 Render's health endpoint is `/api/health`. It returns a healthy response only after Supabase credentials are configured. The service listens on Render's `PORT` and `0.0.0.0` in production.

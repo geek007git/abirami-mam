@@ -78,7 +78,7 @@ export async function api(req,res,url){
   return send(res,404,{error:'Not found'});
 }
 
-const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.svg':'image/svg+xml'};
+const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp'};
 const server=http.createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost');if(url.pathname.startsWith('/api/'))return await api(req,res,url);let rel=decodeURIComponent(url.pathname);if(rel==='/'||rel==='')rel='/index.html';const target=path.resolve(publicDir,'.'+rel);if(target!==publicDir&&!target.startsWith(publicDir+path.sep))return send(res,403,{error:'Forbidden'});try{const file=await readFile(target);res.writeHead(200,{'content-type':types[path.extname(target)]||'application/octet-stream'});res.end(file);}catch{const file=await readFile(path.join(publicDir,'index.html'));res.writeHead(200,{'content-type':types['.html']});res.end(file);}}catch(error){if(configured())return productionError(res,error);send(res,error.message==='Payload too large'?413:500,{error:error.message});}});
 if(process.env.NODE_ENV!=='test'){
   server.listen(port,process.env.NODE_ENV==='production'?'0.0.0.0':'127.0.0.1',()=>console.log(`VS Organics: http://localhost:${port}`));

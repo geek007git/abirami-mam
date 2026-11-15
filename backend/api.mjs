@@ -9,6 +9,13 @@ const originAllowed=req=>!req.headers.origin||new URL(req.headers.origin).host==
 const uuid=x=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(x||'');
 const attempts=new Map();
 function limited(req,key,max,windowMs){const id=`${req.socket.remoteAddress}:${key}`;const now=Date.now();const recent=(attempts.get(id)||[]).filter(t=>now-t<windowMs);recent.push(now);attempts.set(id,recent);return recent.length>max;}
+function siteBase(){
+  try{
+    const url=new URL(process.env.SITE_URL||'');
+    if(url.protocol==='https:'&&!['localhost','127.0.0.1'].includes(url.hostname))return url.origin;
+  }catch{}
+  return process.env.RENDER_EXTERNAL_HOSTNAME?`https://${process.env.RENDER_EXTERNAL_HOSTNAME}`:null;
+}
 const audit=async(actor,action,entityType,entityId,before,after)=>{assertData(await adminClient().from('audit_logs').insert({actor_id:actor.id,action,entity_type:entityType,entity_id:String(entityId),before_data:before,after_data:after}));};
 
 export async function productionApi(req,res,url){
@@ -39,7 +46,7 @@ export async function productionApi(req,res,url){
     if(!originAllowed(req))return fail(res,403,'Invalid origin');
     const input=await parse(req);
     if(!/^\S+@\S+\.\S+$/.test(input.email||''))return fail(res,400,'Enter a valid email address');
-    const base=process.env.SITE_URL|| (process.env.RENDER_EXTERNAL_HOSTNAME?`https://${process.env.RENDER_EXTERNAL_HOSTNAME}`:null);
+    const base=siteBase();
     if(!base)return fail(res,503,'Password recovery is not configured');
     const {error}=await publicClient().auth.resetPasswordForEmail(input.email,{redirectTo:`${base.replace(/\/$/,'')}/reset-password`});
     if(error){console.error('Password recovery:',error.message);return fail(res,503,'Password reset email could not be sent');}
@@ -181,8 +188,10 @@ export async function productionApi(req,res,url){
       const before=assertData(await db.from('store_settings').select('*').eq('id',true).single());const item=assertData(await db.from('store_settings').update(changes).eq('id',true).select().single());await audit(actor,'UPDATE','settings','store',before,item);return json(res,200,{item});
     }
     if(req.method==='POST'&&url.pathname==='/api/admin/staff/invite'){
-      if(actor.role!=='OWNER')return fail(res,403,'Owner only');const input=await parse(req);if(!/^\S+@\S+\.\S+$/.test(input.email||'')||!['CATALOG_MANAGER','FULFILLMENT_STAFF'].includes(input.role))return fail(res,400,'Valid email and role required');
-      const {data,error}=await db.auth.admin.inviteUserByEmail(input.email);if(error)throw error;assertData(await db.from('profiles').update({role:input.role}).eq('id',data.user.id));await audit(actor,'INVITE','staff',data.user.id,null,{email:input.email,role:input.role});return json(res,201,{userId:data.user.id});
+      if(actor.role!=='OWNER')return fail(res,403,'Owner only');const input=await parse(req);if(!/^\S+@\S+\.\S+$/.test(input.email||'')||!['OWNER','CATALOG_MANAGER','FULFILLMENT_STAFF'].includes(input.role))return fail(res,400,'Valid email and role required');
+      const base=siteBase();
+      if(!base)return fail(res,503,'Staff invitations are not configured');
+      const {data,error}=await db.auth.admin.inviteUserByEmail(input.email,{redirectTo:`${base.replace(/\/$/,'')}/reset-password`});if(error)throw error;assertData(await db.from('profiles').update({role:input.role}).eq('id',data.user.id));await audit(actor,'INVITE','staff',data.user.id,null,{email:input.email,role:input.role});return json(res,201,{userId:data.user.id});
     }
     const orderMatch=url.pathname.match(/^\/api\/admin\/orders\/([0-9a-f-]+)\/status$/);
     if(req.method==='PATCH'&&orderMatch&&uuid(orderMatch[1])){

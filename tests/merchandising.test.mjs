@@ -31,3 +31,14 @@ test('catalogue search filters products and escapes the search term', () => {
   assert.match(matching, /Whole Ragi/);
   assert.doesNotMatch(matching, /Country Sugar/);
 });
+
+test('catalogue cards use accessible product imagery when supplied', () => {
+  const pictured = [{
+    ...products[0],
+    images: [{ url: 'assets/products/ragi-preview.jpg', alt_text: 'Provisional pack photograph of millet grains' }],
+  }];
+  const visual = product => `<img src="${product.images[0].url}" alt="${product.images[0].alt_text}">`;
+  const html = renderShop(pictured, 'All products', { ...helpers, visual });
+  assert.match(html, /assets\/products\/ragi-preview\.jpg/);
+  assert.match(html, /alt="Provisional pack photograph of millet grains"/);
+});

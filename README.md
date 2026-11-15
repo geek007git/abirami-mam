@@ -10,7 +10,7 @@ npm.cmd run build
 npm.cmd start
 ```
 
-Open `http://localhost:4173`. Without Supabase credentials, the site serves a preview catalogue and checkout remains disabled in the new storefront. Local JSON records are development data only. When Supabase is configured, the backend switches to database APIs and the server recalculates orders from stored variant prices.
+Open `http://localhost:4173`. Without Supabase credentials, the site serves a preview catalogue and checkout remains disabled in the new storefront. Local JSON records and the images under `assets/products/*-preview.jpg` are launch-rehearsal material only; replace them with client-approved pack photography before publication. When Supabase is configured, the backend switches to database APIs and the server recalculates orders from stored variant prices.
 
 ## Production integration
 
