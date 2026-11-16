@@ -17,4 +17,13 @@ For a client review, `supabase/demo_catalog.sql` adds four clearly marked sample
 
 An existing owner can open `/#/admin/staff` and invite another owner by email. The invitee opens the email, sets their own password, and signs in at `/#/admin`. The Supabase Auth redirect allowlist must include the live site's `/reset-password` URL. Do not share passwords or invitation links through chat.
 
+## Google sign-in (customer and staff)
+
+1. In Google Cloud Console, configure the OAuth consent screen for the intended audience and create a **Web application** OAuth client. Use `https://vs-organics-store.onrender.com` as the authorized JavaScript origin. Use the exact Supabase Google callback shown in **Authentication → Sign In / Providers → Google** as the authorized redirect URI (for this project: `https://yrecqoqlxddggwsznmrs.supabase.co/auth/v1/callback`).
+2. In the VS Organics Supabase project, open **Authentication → Sign In / Providers → Google**, enter the Google Client ID and Client Secret there, and enable the provider. Keep the secret in the dashboard, never in the repository or chat. The site reads Supabase's public provider status; Google buttons appear automatically after the provider is enabled.
+3. Keep the Supabase Site URL at `https://vs-organics-store.onrender.com`. Correct the separate password/invitation redirect allowlist entry to `https://vs-organics-store.onrender.com/reset-password`.
+4. Test customer Google sign-in at `/#/account`. Test admin Google sign-in at `/#/admin` with an email whose `public.profiles.role` is already `OWNER`, `CATALOG_MANAGER` or `FULFILLMENT_STAFF`. Google sign-in alone never grants staff access. Supabase automatically links a verified Google identity to an existing account with the same email; verify the resulting user ID and role before client handoff.
+
+The backend uses Supabase's implicit OAuth flow and receives the session in the browser URL fragment. The storefront removes the fragment immediately and stores the access token in session storage, matching the existing password-login session handling.
+
 Render's health endpoint is `/api/health`. It returns a healthy response only after Supabase credentials are configured. The service listens on Render's `PORT` and `0.0.0.0` in production.

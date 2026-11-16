@@ -45,7 +45,7 @@ export async function api(req,res,url){
   if(process.env.NODE_ENV==='production')return send(res,503,{error:'Database connection is not configured'});
   const store=await loadStore();
   if(req.method==='GET'&&url.pathname==='/api/health') return send(res,200,{ok:true,mode:process.env.SUPABASE_URL?'supabase-ready':'local-development'});
-  if(req.method==='GET'&&url.pathname==='/api/config') return send(res,200,{catalogSource:'preview',storeLive:false,whatsappNumber:null});
+  if(req.method==='GET'&&url.pathname==='/api/config') return send(res,200,{catalogSource:'preview',storeLive:false,whatsappNumber:null,googleAuthEnabled:false});
   if(req.method==='GET'&&url.pathname==='/api/catalog/products') return send(res,200,{items:store.products.filter(p=>p.active)});
   if(req.method==='POST'&&url.pathname==='/api/checkout/quote'){
     const input=await body(req);const lines=[];

@@ -8,7 +8,18 @@ const parse=async(req,limit=100_000)=>{let raw='';for await(const chunk of req){
 const originAllowed=req=>!req.headers.origin||new URL(req.headers.origin).host===req.headers.host;
 const uuid=x=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(x||'');
 const attempts=new Map();
+let googleSettings={checkedAt:0,enabled:false};
 function limited(req,key,max,windowMs){const id=`${req.socket.remoteAddress}:${key}`;const now=Date.now();const recent=(attempts.get(id)||[]).filter(t=>now-t<windowMs);recent.push(now);attempts.set(id,recent);return recent.length>max;}
+async function googleEnabled(){
+  if(Date.now()-googleSettings.checkedAt<60_000)return googleSettings.enabled;
+  let enabled=false;
+  try{
+    const response=await fetch(`${process.env.SUPABASE_URL.replace(/\/$/,'')}/auth/v1/settings`,{headers:{apikey:process.env.SUPABASE_PUBLISHABLE_KEY},signal:AbortSignal.timeout(4000)});
+    if(response.ok)enabled=Boolean((await response.json()).external?.google);
+  }catch{}
+  googleSettings={checkedAt:Date.now(),enabled};
+  return enabled;
+}
 function siteBase(){
   try{
     const url=new URL(process.env.SITE_URL||'');
@@ -31,9 +42,18 @@ export async function productionApi(req,res,url){
     checks.relationships=embedded.error?.code||'ok';
     return json(res,200,{revision:process.env.RENDER_GIT_COMMIT?.slice(0,7)||null,checks});
   }
-  if(req.method==='GET'&&url.pathname==='/api/config')return json(res,200,{catalogSource:'supabase',storeLive:process.env.STORE_LIVE==='true',whatsappNumber:process.env.WHATSAPP_NUMBER||null});
+  if(req.method==='GET'&&url.pathname==='/api/config')return json(res,200,{catalogSource:'supabase',storeLive:process.env.STORE_LIVE==='true',whatsappNumber:process.env.WHATSAPP_NUMBER||null,googleAuthEnabled:await googleEnabled()});
   if(req.method==='GET'&&url.pathname==='/api/catalog/products')return json(res,200,{items:await catalog()});
   if(req.method==='GET'&&url.pathname==='/api/catalog/categories')return json(res,200,{items:assertData(await db.from('categories').select('id,name,slug').eq('active',true).order('sort_order'))});
+  if(req.method==='GET'&&url.pathname==='/api/auth/google/start'){
+    if(limited(req,'google-start',30,15*60_000))return fail(res,429,'Please try again later');
+    if(!await googleEnabled())return fail(res,503,'Google sign-in is not configured yet');
+    const base=siteBase();
+    if(!base)return fail(res,503,'Google sign-in is not configured yet');
+    const {data,error}=await publicClient().auth.signInWithOAuth({provider:'google',options:{redirectTo:base,skipBrowserRedirect:true}});
+    if(error||!data.url)return fail(res,503,'Google sign-in could not be started');
+    return json(res,200,{url:data.url});
+  }
   if(req.method==='POST'&&url.pathname==='/api/auth/login'){
     if(limited(req,'login',10,15*60_000))return fail(res,429,'Too many sign-in attempts');
     if(!originAllowed(req))return fail(res,403,'Invalid origin');
